@@ -1,0 +1,691 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "chatId": "={{ $('Prompt mensaje clima').item.json.chatId }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1168,
+        80
+      ],
+      "id": "9cd0e639-d924-40ce-87a0-0c4c75e84851",
+      "name": "Envia mensaje bot telegram",
+      "webhookId": "17169139-951d-4cfe-8c4b-1c5e78796c77",
+      "credentials": {
+        "telegramApi": {
+          "id": "Xz6Hhb5Cn5HhV0DD",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        880,
+        80
+      ],
+      "id": "4ec47f83-a98d-4515-85ee-6fab989a71ca",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "llama3.2:3b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        880,
+        256
+      ],
+      "id": "06e620ca-c773-49e9-b4c0-12e4d0d28263",
+      "name": "Ollama IA",
+      "credentials": {
+        "ollamaApi": {
+          "id": "6WBqs8oY5hDyompq",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.open-meteo.com/v1/forecast",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "latitude",
+              "value": "={{ $json.lat }}"
+            },
+            {
+              "name": "longitude",
+              "value": "={{ $json.lon }}"
+            },
+            {
+              "name": "current_weather",
+              "value": "true"
+            },
+            {
+              "name": "timezone",
+              "value": "auto"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        496,
+        80
+      ],
+      "id": "51d856cc-855b-4faa-8306-5fde9eed7e49",
+      "name": "Obtencion de Climas"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=El usuario escribió: \"{{$json.ciudad}}\"\n\nTu única tarea es determinar si esto es una ciudad real del mundo, incluso si está mal escrita.\n\nResponde ÚNICAMENTE en JSON sin texto adicional, sin comillas adicionales, sin bloques de código:\nSi es una ciudad válida:\n{\"ciudad\": \"nombre correcto de la ciudad\", \"valida\": true}\n\nSi NO es una ciudad válida:\n{\"valida\": false}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -656,
+        112
+      ],
+      "id": "311e8ded-8152-466a-8722-c6c23edbdc80",
+      "name": "AI Agent1"
+    },
+    {
+      "parameters": {
+        "model": "llama3.2:3b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        -656,
+        336
+      ],
+      "id": "f35e4ed4-6046-43b9-aada-ec4515be9656",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "6WBqs8oY5hDyompq",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://geocoding-api.open-meteo.com/v1/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ $json.ciudad }}"
+            },
+            {
+              "name": "count",
+              "value": "1"
+            },
+            {
+              "name": "language",
+              "value": "es"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        112,
+        80
+      ],
+      "id": "9b8749e7-e451-45e2-80f8-734e3193c83c",
+      "name": "HTTP Geocoding"
+    },
+    {
+      "parameters": {
+        "jsCode": "const geoData = $input.first().json;\nconst ciudadData = $('Extraer mensaje').first().json;\n\nif (!geoData.results || geoData.results.length === 0) {\n  return [{ json: { sinMensaje: true } }];\n}\n\nconst lugar = geoData.results[0];\n\nreturn [{ json: {\n  lat: lugar.latitude,\n  lon: lugar.longitude,\n  nombre: lugar.name,\n  pais: lugar.country,\n  chatId: ciudadData.chatId\n}}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        80
+      ],
+      "id": "06bbe2ea-5a4d-4eae-a069-8bf90d11f3a3",
+      "name": "Extraer Coordenadas"
+    },
+    {
+      "parameters": {
+        "jsCode": "const weatherData = $input.first().json;\nconst ciudadData = $('Extraer mensaje').first().json;\nconst geoData = $('Extraer Coordenadas').first().json;\n\nconst ciudad = geoData.nombre ?? \"la ciudad consultada\";\nconst pais = geoData.pais ?? \"\";\nconst chatId = ciudadData.chatId;\n\nconst temp = weatherData.current_weather?.temperature ?? \"N/A\";\nconst viento = weatherData.current_weather?.windspeed ?? \"N/A\";\nconst codigo = weatherData.current_weather?.weathercode ?? \"N/A\";\n\nconst prompt = `\nEres un asistente de clima amigable. El usuario preguntó por el clima de ${ciudad}, ${pais}.\n\nDatos actuales:\n- Temperatura: ${temp}°C\n- Viento: ${viento} km/h\n- Código WMO: ${codigo}\n\nRedacta un mensaje corto en español con emojis para responder por Telegram. Máximo 3 líneas.\n`;\n\nreturn [{ json: { prompt, chatId } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        80
+      ],
+      "id": "ac0d558f-1a5c-44d4-884d-44993a531794",
+      "name": "Prompt mensaje clima"
+    },
+    {
+      "parameters": {
+        "jsCode": "const agentOutput = $input.first().json.output;\nconst ciudadData = $('Extraer mensaje').first().json;\n\nlet parsed;\ntry {\n  const clean = agentOutput.replace(/```json|```/g, \"\").trim();\n  parsed = JSON.parse(clean);\n} catch(e) {\n  return [{ json: { sinMensaje: true } }];\n}\n\nif (!parsed.valida) {\n  return [{ json: { sinMensaje: true } }];\n}\n\nreturn [{ json: {\n  ciudad: parsed.ciudad,\n  chatId: ciudadData.chatId\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -272,
+        96
+      ],
+      "id": "8d9af1cb-e580-491c-936d-de976810bdb7",
+      "name": "Validacion Ciudad"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "aadb6d68-5164-47d8-a99d-94a305c55ca9",
+              "leftValue": "={{ $json.sinMensaje }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -64,
+        96
+      ],
+      "id": "dbfdd738-5e31-4138-9d3f-e72363264c5b",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Extraer mensaje').item.json.chatId }}",
+        "text": "=❌ No reconocí esa ciudad. Intenta escribir el nombre correctamente.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        64,
+        288
+      ],
+      "id": "3a66f53d-cf1d-4627-a4b4-9db675e10d93",
+      "name": "Mensaje de Error ❌",
+      "webhookId": "95793f01-fdac-426f-a215-db8a014ed554",
+      "credentials": {
+        "telegramApi": {
+          "id": "Xz6Hhb5Cn5HhV0DD",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "17Z6cNd52dIImN2xH6yR0YHLqo2Ie3PMU5SA4vXGBGOU",
+          "mode": "list",
+          "cachedResultName": "weatherBot",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/17Z6cNd52dIImN2xH6yR0YHLqo2Ie3PMU5SA4vXGBGOU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/17Z6cNd52dIImN2xH6yR0YHLqo2Ie3PMU5SA4vXGBGOU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Temperatura": "={{$('Obtencion de Climas').first().json.current_weather.temperature}}",
+            "Pais": "={{$('Extraer Coordenadas').first().json.pais}}",
+            "Ciudad": "={{$('Extraer Coordenadas').first().json.nombre}}",
+            "Fecha": "={{new Date().toISOString()}}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Fecha",
+              "displayName": "Fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Ciudad",
+              "displayName": "Ciudad",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Pais",
+              "displayName": "Pais",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Temperatura",
+              "displayName": "Temperatura",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "latitude",
+              "displayName": "latitude",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "longitude",
+              "displayName": "longitude",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "generationtime_ms",
+              "displayName": "generationtime_ms",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "utc_offset_seconds",
+              "displayName": "utc_offset_seconds",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "timezone",
+              "displayName": "timezone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "timezone_abbreviation",
+              "displayName": "timezone_abbreviation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "elevation",
+              "displayName": "elevation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "current_weather_units",
+              "displayName": "current_weather_units",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "current_weather",
+              "displayName": "current_weather",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        672,
+        288
+      ],
+      "id": "4c55d9cc-e913-471f-8c19-b2583d0ea222",
+      "name": "Guardar info",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "j2OkyhURzTMbmYgb",
+          "name": "Goolge Sheets-danielplazas1929@gmail.com"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO consultas_clima (ciudad, pais, temperatura, chat_id)\nVALUES (\n  \n  '{{ $('Extraer Coordenadas').first().json.nombre }}',\n  '{{ $('Extraer Coordenadas').first().json.pais }}',\n  {{ $('Obtencion de Climas').first().json.current_weather.temperature }},\n  {{ $('Extraer mensaje').first().json.chatId }}\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        656,
+        -144
+      ],
+      "id": "12646d11-0670-4514-95dc-b4230711ab56",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "yt4MX8gNT1RPDm83",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst ultimoUpdate = response.result[response.result.length - 1];\n\nif (!ultimoUpdate || !ultimoUpdate.message?.text) {\n  return [{ json: { sinMensaje: true } }];\n}\n\nreturn [{ json: {\n  ciudad: ultimoUpdate.message.text.trim(),\n  chatId: ultimoUpdate.message.chat.id\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -880,
+        112
+      ],
+      "id": "feeb7933-7e21-4797-9198-7146133df3b0",
+      "name": "Extraer mensaje"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.telegram.org/bot8702932926:AAEb_HGIqEWDhbOMBrFGzS-Ou1vVlzz1sZ8/getUpdates",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "1"
+            },
+            {
+              "name": "offset",
+              "value": "-1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1040,
+        112
+      ],
+      "id": "2b2cbe22-6f45-4d7b-8326-f59abb51a6fe",
+      "name": "getUpdates"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 1000
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1216,
+        112
+      ],
+      "id": "b8871de3-ca83-40c9-aec6-a260fa7bac4f",
+      "name": "Schedule Trigger"
+    }
+  ],
+  "connections": {
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Envia mensaje bot telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama IA": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtencion de Climas": {
+      "main": [
+        [
+          {
+            "node": "Guardar info",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prompt mensaje clima",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "Validacion Ciudad",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Geocoding": {
+      "main": [
+        [
+          {
+            "node": "Extraer Coordenadas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer Coordenadas": {
+      "main": [
+        [
+          {
+            "node": "Obtencion de Climas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt mensaje clima": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validacion Ciudad": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Geocoding",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mensaje de Error ❌",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar info": {
+      "main": [
+        []
+      ]
+    },
+    "Extraer mensaje": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "getUpdates": {
+      "main": [
+        [
+          {
+            "node": "Extraer mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "getUpdates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "308ce719a92085626b92362155505cb63e39f88d9d93510835c3846ec4185109"
+  }
+}
